@@ -3,10 +3,11 @@
 #include <string.h>
 #include <Windows.h>
 #include <pthread.h>
+#include <semaphore.h>
 
 #include "rs232.h"
 
-//#define DEBUG_PACKAGE
+#define DEBUG_PACKAGE
 //#define DEBUG
 #ifdef DEBUG
 #define DEBUG_PRINT(fmt, ...) printf(fmt, ##__VA_ARGS__)
@@ -106,7 +107,8 @@ int gChgScn = false;
 int gChgAdc = false;
 int adcVal;
 
-int gKey = 1;
+sem_t bin_sem;
+sem_t bin_sem2;
 
 static int isValidTp(unsigned char tp)
 {
@@ -139,15 +141,15 @@ static void parseTpData(Hud2VehCmd *cmd)
         case TP_RET_KEY_PRESS:
             if (cmd->d[0] == 0x0)
                 printf(">>>>>> HUD Return OK");
-            gKey = 0;
+            sem_post(&bin_sem);
             break;
         case TP_RET_ADC_LIGHT:
             printf(">>>>>> ADC LIGHT is: %x-%x-%x ", cmd->d[0], cmd->d[1], cmd->d[2]);
-            gKey = 0;
+            sem_post(&bin_sem);
             break;
         case TP_RET_ADC_THERMAL:
             printf(">>>>>> ADC THERMAL is: %x-%x ", cmd->d[0], cmd->d[1]);
-            gKey = 0;
+            sem_post(&bin_sem);
             break;
     }
 }
@@ -359,6 +361,7 @@ unsigned char packOutoutData(unsigned char* outDataBuf, OutputProtocol *TpData)
     printf(":>cmdLen = %d\n", cmdLen);
 
 #endif
+    sem_post(&bin_sem2);
     return cmdLen;
 }
 
@@ -507,6 +510,7 @@ void SecondMenu(int typeData)
                     //printf("\tyour select is ==> %d\n", choice);
                     printf("\t<<show color bar>>\n");
                     gChgScn = 0x34;
+                    sem_wait(&bin_sem2);
                     break;
                 case 2:
                     //printf("\tyour select is ==> %d\n", choice);
@@ -538,15 +542,13 @@ void SecondMenu(int typeData)
                     //printf("\tyour select is ==> %d\n", choice);
                     printf("\t<<get adc of light>>\n");
                     gChgScn = 0x31;
-                    while (gKey);
-                    gKey = 1;
+                    sem_wait(&bin_sem);
                     break;
                 case 8:
                     //printf("\tyour select is ==> %d\n", choice);
                     printf("\t<<get adc of thermal>>\n");
                     gChgScn = 0x32;
-                    while (gKey);
-                    gKey = 1;
+                    sem_wait(&bin_sem);
                     break;
                 case 9:
                     //printf("\tyour select is ==> %d\n", choice);
@@ -599,6 +601,8 @@ int main()
     if (ret)
         return(0);
     
+    sem_init(&bin_sem, 0, 0);
+    sem_init(&bin_sem2, 0, 0);
     Sleep(1);
     printf("[HUD simulator] HUD version: %d\n", gVersion);  
 
@@ -617,8 +621,7 @@ int main()
             case ASUS_PRODUCION:
                 gCommand = ASUS_PRODUCION;
                 printf("your select is ==> %s\n", FACTORY_MODE_CMD);
-                while (gKey); 
-                gKey = 1;
+                sem_wait(&bin_sem);
                 SecondMenu(choice);
                 break;
             case ASUS_ADJUSTMENT:
