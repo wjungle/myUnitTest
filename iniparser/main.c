@@ -20,9 +20,15 @@ struct widgetInfo_t
     char bitH;
     char bitL;
     int len;
-    struct widgetInfo_t* next;
 } ;
 typedef struct widgetInfo_t WidgetInfo_t;
+
+struct widgetNode_t
+{
+    WidgetInfo_t info;
+    struct widgetNode_t* next;
+} ;
+typedef struct widgetNode_t WidgetNode_t;
 
 /*
 typedef struct 
@@ -38,6 +44,7 @@ struct canIdNode
 {
     int canId;
     struct canIdNode *next;
+    WidgetNode_t* start;
 };
 typedef struct canIdNode CanIdNode;
 typedef CanIdNode *CanIdNodePtr;
@@ -45,7 +52,7 @@ typedef CanIdNode *CanIdNodePtr;
 
 /* Dynamic Array */
 struct _darray_t;
-typedef struct _darray_t darray_t;
+typedef struct _darray_t Darray_t;
 
 struct _darray_t
 {  
@@ -57,18 +64,18 @@ struct _darray_t
     CanIdNodePtr elems;
     //struct widgetInfo_t* start;
 };
-darray_t* darray_create(void);
-bool darray_push_back(darray_t* self, void* data);
-bool darray_empty(const darray_t* self);
-bool darray_is_full(const darray_t* self);
-int darray_ring_size(const darray_t* self);
-int darray_size(const darray_t* self);
-int darray_capacity(const darray_t* self);
-void darray_print(const darray_t* self);
+Darray_t* darray_create(void);
+bool darray_push_back(Darray_t* self, void* data);
+bool darray_empty(const Darray_t* self);
+bool darray_is_full(const Darray_t* self);
+int darray_ring_size(const Darray_t* self);
+int darray_size(const Darray_t* self);
+int darray_capacity(const Darray_t* self);
+void darray_print(const Darray_t* self);
 
-darray_t* darray_create(void)
+Darray_t* darray_create(void)
 {
-    darray_t* darr = malloc(sizeof(darray_t));
+    Darray_t* darr = malloc(sizeof(Darray_t));
     
     if (darr != NULL)
     {
@@ -88,7 +95,7 @@ darray_t* darray_create(void)
     return darr;
 }
 
-static bool darray_expand(darray_t* self)
+static bool darray_expand(Darray_t* self)
 {
     size_t capacity;
     size_t need = 1;
@@ -135,15 +142,13 @@ static bool darray_expand(darray_t* self)
     return true;
 }
 
-bool darray_push_back(darray_t* self, void* data) 
+bool darray_push_back(Darray_t* self, void* data) 
 {
     assert(self);
     if (darray_expand(self))
     {
         self->elems[self->tail++] = *((CanIdNodePtr)data);
-        //self->tail = (self->tail + 1);
         self->size++;
-        //printf("head=%I64d, tail=%I64d\n", self->head, self->tail);
     } 
     else
     {
@@ -154,7 +159,7 @@ bool darray_push_back(darray_t* self, void* data)
 }
 
 /*
-bool darray_ring_append(darray_t* self, int data) //void*
+bool darray_ring_append(Darray_t* self, int data) //void*
 {
     assert(self);
     
@@ -174,14 +179,14 @@ bool darray_ring_append(darray_t* self, int data) //void*
 */
 
 /* method of getting size/capacity  */
-bool darray_empty(const darray_t* self)
+bool darray_empty(const Darray_t* self)
 {
     assert(self);
     //return self->head == self->tail;
     return self->tail == 0;
 }
 
-bool darray_is_full(const darray_t* self)
+bool darray_is_full(const Darray_t* self)
 {
     //int real_capacity = self->capacity - 1;
     assert(self);
@@ -191,7 +196,7 @@ bool darray_is_full(const darray_t* self)
 
 //for ring buffer
 /*
-int darray_ring_size(const darray_t* self)
+int darray_ring_size(const Darray_t* self)
 {
     int size = 0;
     
@@ -203,17 +208,17 @@ int darray_ring_size(const darray_t* self)
 }
 */
 
-int darray_size(const darray_t* self)
+int darray_size(const Darray_t* self)
 {
     return self->size;
 }
 
-int darray_capacity(const darray_t* self)
+int darray_capacity(const Darray_t* self)
 {
     return self->capacity;
 }
 
-void darray_print(const darray_t* self)
+void darray_print(const Darray_t* self)
 {
     int i;
     assert(self);
@@ -235,12 +240,22 @@ void darray_print(const darray_t* self)
         {
             printf("%d(0x%x) ", self->elems[i].canId, self->elems[i].canId);
         }
+        WidgetNode_t *node = self->elems->start;
+        while (node != NULL)
+        {
+            //printf("have widget\n");
+            //printf("widget=%d ", self->elems->start->info.widget);
+            //printf("byte H:%d L:%d\n", self->elems->start->info.byteH, self->elems->start->info.byteL);
+            printf("widget=%d ", node->info.widget);
+            printf("byte H:%d L:%d\n", node->info.byteH, node->info.byteL);
+            node = node->next;
+        }
 #endif
     }
 }
 
 /*
-bool is_drrary_empty(const darray_t* self)
+bool is_drrary_empty(const Darray_t* self)
 {
     assert(self);
     return self->size <= 0;
@@ -250,22 +265,27 @@ bool is_drrary_empty(const darray_t* self)
 //tCanbusFormat theCanbusFmt;
 static dictionary* canFmtIni;
 
-void add_node(CanIdNodePtr *start, int canId)
+void add_widget(const int canId, Darray_t* darray, WidgetInfo_t* info)
 {
-    CanIdNodePtr newPtr;
-    newPtr = (CanIdNodePtr)malloc(sizeof(CanIdNode));
-    newPtr->canId = canId;
-    newPtr->next = NULL;
+    WidgetNode_t* nodePtr;
+    nodePtr = (WidgetNode_t*)malloc(sizeof(WidgetNode_t));
+    nodePtr->info.widget = info->widget;
+    nodePtr->info.byteH = info->byteH;
+    nodePtr->info.byteL = info->byteL;
+    nodePtr->next = NULL;
     
-    if (start == NULL) {
-        *start = newPtr;
+    if (darray->elems->start == NULL) {
+        darray->elems->start = nodePtr;
+        printf("(%d)\n", __LINE__);
         return;
     }
-    else {
-        CanIdNodePtr curPtr = *start;
+    else
+    {
+        printf("(%d)\n", __LINE__);
+        WidgetNode_t* curPtr = darray->elems->start;
         while (curPtr->next != NULL)
             curPtr = curPtr->next;
-        curPtr->next = newPtr;
+        curPtr->next = nodePtr;
     }
     return;
 }
@@ -274,7 +294,8 @@ void add_node(CanIdNodePtr *start, int canId)
 int main(int argc, char* argv[])
 {
     int canId;
-    WidgetInfo_t* widgetPtr;
+    WidgetInfo_t info;
+  
     canFmtIni = iniparser_load("canbusfmt.ini");
     if (!canFmtIni)
     {
@@ -286,35 +307,38 @@ int main(int argc, char* argv[])
         dictionary_set(canFmtIni, "odo", NULL);
     }
     
-    darray_t* darray = darray_create();
+    Darray_t* darrayPtr = darray_create();
     // speed
     canId = iniparser_getint(canFmtIni, "speed:canid", 0x101);
+    //if canId is new
+    CanIdNode canIdNode = {canId, NULL, NULL};
+    darray_push_back(darrayPtr, (void*)&canIdNode);  
     
+    info.widget = WS_SPEED;
+    info.byteH = iniparser_getint(canFmtIni, "speed:byteH", 0);
+    info.byteL = iniparser_getint(canFmtIni, "speed:byteL", 0);
+    add_widget(canId, darrayPtr, &info);
     
-    widgetPtr = (WidgetInfo_t*)malloc(sizeof(WidgetInfo_t));
-    if (!widgetPtr)
-        printf("errlr\n");
-    widgetPtr->widget = WS_SPEED;
-    widgetPtr->byteH = iniparser_getint(canFmtIni, "speed:byteH", 0);
-    widgetPtr->byteL = iniparser_getint(canFmtIni, "speed:byteL", 0);
-    widgetPtr->next = NULL;
-    darray_push_back(darray, (void*)&canId);
+    // odo
+    info.widget = WS_ODO;
+    canId = iniparser_getint(canFmtIni, "odo:canid", 0x102);
+    info.byteH = iniparser_getint(canFmtIni, "odo:byteH", 0);
+    info.byteL = iniparser_getint(canFmtIni, "odo:byteL", 0); 
+    add_widget(canId, darrayPtr, &info);
 
+    darray_print(darrayPtr);
 /*
     // gear
     theCanbusFmt.gear.canId = iniparser_getint(canFmtIni, "gear:canid", 0x102);
     theCanbusFmt.gear.byteH = iniparser_getint(canFmtIni, "gear:byteH", 0);
     theCanbusFmt.gear.byteL = iniparser_getint(canFmtIni, "gear:byteL", 0);  
 
-    // odo
-    theCanbusFmt.odo.canId = iniparser_getint(canFmtIni, "odo:canid", 0x102);
-    theCanbusFmt.odo.byteH = iniparser_getint(canFmtIni, "odo:byteH", 0);
-    theCanbusFmt.odo.byteL = iniparser_getint(canFmtIni, "odo:byteL", 0);  
+ 
 */
     //printf("0x%x\n", theCanbusFmt.speed.canId);
 
 #if 0    
-    darray_t* darray = darray_create();
+    Darray_t* darray = darray_create();
     int cnt = 1;
     int number = atoi(argv[1]);
     printf(">>>(%d)\n", __LINE__);
@@ -324,6 +348,7 @@ int main(int argc, char* argv[])
         cnt++;
     }
     printf(">>>(%d)\n", __LINE__);
-#endif
+
     darray_print(darray);
+#endif
 }
