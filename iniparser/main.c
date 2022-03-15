@@ -45,10 +45,12 @@ struct _darray_t
     int *elems;
 };
 darray_t* darray_create(void);
-bool darray_append(darray_t* self, int data);
-bool darray_is_empty(const darray_t* self);
+bool darray_push_back(darray_t* self, int data);
+bool darray_empty(const darray_t* self);
 bool darray_is_full(const darray_t* self);
+int darray_ring_size(const darray_t* self);
 int darray_size(const darray_t* self);
+int darray_capacity(const darray_t* self);
 void darray_print(const darray_t* self);
 
 darray_t* darray_create(void)
@@ -78,33 +80,62 @@ static bool darray_expand(darray_t* self)
     size_t capacity;
     size_t need = 1;
     //int* old_darr;
-    int* new_darr;
+    //int* new_darr;
     assert(self);
     
+    printf("capacity=%d, size=%d\n", darray_capacity(self), darray_size(self));
     if (self->size + need > self->capacity)
     {
-        capacity = self->capacity << 1;   //double memory alloc
-        //old_darr = self->elems;
-        //new_darr = malloc(self->capacity * sizeof(int));
+        //capacity = (darray_capacity(self) << 1;   //double memory alloc
+        capacity = darray_capacity(self) + (darray_capacity(self) >> 1);   //1.5 memory alloc
+        int* old_darr = self->elems;
+        //printf(">>>(%d)\n", __LINE__);
+        int* new_darr = malloc(capacity * sizeof(int));
+        //printf(">>>(%d) %p\n", __LINE__, new_darr);
+        if (!new_darr)
+            return false;
+        printf(">>>(%d)\n", __LINE__);
+        size_t s = 0;
+        while (s < darray_size(self))
+        {
+            printf("mv old to new: s=%I64d old=%d\n", s, old_darr[s]);
+            new_darr[s] = old_darr[s];
+            s++;
+        }
+        
+        self->elems = new_darr;
+        self->tail = s;
+        self->capacity = capacity;
+        printf("expand>>>>>> capacity=%d, size=%d\n", darray_capacity(self), darray_size(self));
+        //printf(">>>>%I64d, %I64d\n", self->tail, self->capacity);
+        free(old_darr);
+        #if 0
         new_darr = (int*)realloc(self->elems, self->capacity * sizeof(int));
         if (new_darr)
         {
             self->elems = new_darr;
             self->capacity = capacity;
         }
+        #endif
     }
-    return ((self->size + need) <= self->capacity) ? false : true;
+    //return ((self->size + need) <= self->capacity) ? false : true;
+    return true;
 }
 
-bool darray_append(darray_t* self, int data) 
+bool darray_push_back(darray_t* self, int data) 
 {
     assert(self);
-    darray_expand(self);
-
-    self->elems[self->tail++] = data;
-    //self->tail = (self->tail + 1);
-    self->size++;
-    //printf("head=%I64d, tail=%I64d\n", self->head, self->tail);
+    if (darray_expand(self))
+    {
+        self->elems[self->tail++] = data;
+        //self->tail = (self->tail + 1);
+        self->size++;
+        //printf("head=%I64d, tail=%I64d\n", self->head, self->tail);
+    } 
+    else
+    {
+        printf("expand failed\n");
+    }
     
     return true;
 }
@@ -127,7 +158,8 @@ bool darray_ring_append(darray_t* self, int data) //void*
     return true;
 }
 
-bool darray_is_empty(const darray_t* self)
+/* method of getting size/capacity  */
+bool darray_empty(const darray_t* self)
 {
     assert(self);
     //return self->head == self->tail;
@@ -138,12 +170,12 @@ bool darray_is_full(const darray_t* self)
 {
     //int real_capacity = self->capacity - 1;
     assert(self);
-    //return darray_size(self) == real_capacity;
+    //return darray_ring_size(self) == real_capacity;
     return self->capacity == self->size;
 }
 
 //for ring buffer
-int darray_size(const darray_t* self)
+int darray_ring_size(const darray_t* self)
 {
     int size = 0;
     
@@ -154,26 +186,35 @@ int darray_size(const darray_t* self)
     return size;
 }
 
+int darray_size(const darray_t* self)
+{
+    return self->size;
+}
+
+int darray_capacity(const darray_t* self)
+{
+    return self->capacity;
+}
+
 void darray_print(const darray_t* self)
 {
     int i;
-    
-    
     assert(self);
-    if (darray_is_empty(self))
+    
+    if (darray_empty(self))
         printf("drray is empty!\n");
     else
     {
 #if 0
         int curIdx = self->head + 1;
-        for (i = 0; i < darray_size(self); i++)
+        for (i = 0; i < darray_ring_size(self); i++)
         {
             printf("%d ", self->elems[curIdx]);
             curIdx = (curIdx + 1) % self->capacity;
         }
 #else
-        printf("capacity=%I64d, size=%I64d\n", self->capacity, self->size);
-        for (i = 0; i < self->size; i++)
+        printf("=====capacity=%I64d, size=%I64d=====\n", self->capacity, self->size);
+        for (i = 0; i < darray_size(self); i++)
         {
             printf("%d ", self->elems[i]);
         }
@@ -213,7 +254,7 @@ void add_node(CanIdNodePtr *start, int canId)
 }
 
 
-int main()
+int main(int argc, char* argv[])
 {
     canFmtIni = iniparser_load("canbusfmt.ini");
     if (!canFmtIni)
@@ -244,20 +285,23 @@ int main()
     
     darray_t* darray = darray_create();
     int cnt = 1;
-    for (int i = 0; i < 11; i++)
+    int number = atoi(argv[1]);
+    printf(">>>(%d)\n", __LINE__);
+    for (int i = 0; i < number; i++)
     {
-        darray_append(darray, cnt);
+        darray_push_back(darray, cnt);
         cnt++;
     }
+    printf(">>>(%d)\n", __LINE__);
     /*
-    darray_append(darray, 11);
-    darray_append(darray, 22);
-    darray_append(darray, 33);
-    darray_append(darray, 44);
-    darray_append(darray, 55);
-    darray_append(darray, 66);
-    darray_append(darray, 77);
+    darray_push_back(darray, 11);
+    darray_push_back(darray, 22);
+    darray_push_back(darray, 33);
+    darray_push_back(darray, 44);
+    darray_push_back(darray, 55);
+    darray_push_back(darray, 66);
+    darray_push_back(darray, 77);
     */
     darray_print(darray);
-    //printf("darray_is_empty:%d\n", darray_is_empty(darray));
+    //printf("darray_empty:%d\n", darray_empty(darray));
 }
