@@ -45,7 +45,7 @@ struct _darray_t
     int *elems;
 };
 darray_t* darray_create(void);
-bool darray_push_back(darray_t* self, int data);
+bool darray_push_back(darray_t* self, void* data);
 bool darray_empty(const darray_t* self);
 bool darray_is_full(const darray_t* self);
 int darray_ring_size(const darray_t* self);
@@ -122,12 +122,12 @@ static bool darray_expand(darray_t* self)
     return true;
 }
 
-bool darray_push_back(darray_t* self, int data) 
+bool darray_push_back(darray_t* self, void* data) 
 {
     assert(self);
     if (darray_expand(self))
     {
-        self->elems[self->tail++] = data;
+        self->elems[self->tail++] = *((int*)data);
         //self->tail = (self->tail + 1);
         self->size++;
         //printf("head=%I64d, tail=%I64d\n", self->head, self->tail);
@@ -289,7 +289,7 @@ int main(int argc, char* argv[])
     printf(">>>(%d)\n", __LINE__);
     for (int i = 0; i < number; i++)
     {
-        darray_push_back(darray, cnt);
+        darray_push_back(darray, (void*)&cnt);
         cnt++;
     }
     printf(">>>(%d)\n", __LINE__);
