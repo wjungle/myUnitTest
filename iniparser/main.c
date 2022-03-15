@@ -5,22 +5,33 @@
 #include "iniparser.h"
 #include "dictionary.h"
 
-typedef struct
+typedef enum _WIESS_CUSTOMIZE_WIDGET
 {
-    int canId;
+    WS_SPEED    = 1,
+    WS_GEAR     = 2,
+    WS_ODO      = 3,
+} WIESS_CUSTOMIZE_WIDGET;
+
+struct widgetInfo_t
+{
+    WIESS_CUSTOMIZE_WIDGET widget;
     char byteH;
     char byteL;
     char bitH;
     char bitL;
     int len;
-} tElementInfo;
+    struct widgetInfo_t* next;
+} ;
+typedef struct widgetInfo_t WidgetInfo_t;
 
+/*
 typedef struct 
 {
     tElementInfo speed;
     tElementInfo gear;
     tElementInfo odo;
 } tCanbusFormat;
+*/
 
 /* Link List */
 struct canIdNode
@@ -40,9 +51,11 @@ struct _darray_t
 {  
     size_t size;        // used size
     size_t capacity;    // allocate size
-    size_t head;
+    //size_t head;
     size_t tail;
-    int *elems;
+    //int *elems;
+    CanIdNodePtr elems;
+    //struct widgetInfo_t* start;
 };
 darray_t* darray_create(void);
 bool darray_push_back(darray_t* self, void* data);
@@ -61,9 +74,9 @@ darray_t* darray_create(void)
     {
         darr->size = 0;
         darr->capacity = 5; // for test
-        darr->head = 0;
+        //darr->head = 0;
         darr->tail = 0;
-        darr->elems = malloc(darr->capacity * sizeof(int));
+        darr->elems = malloc(darr->capacity * sizeof(CanIdNode));
         if (!darr->elems)
         {
             free(darr->elems);
@@ -88,9 +101,9 @@ static bool darray_expand(darray_t* self)
     {
         //capacity = (darray_capacity(self) << 1;   //double memory alloc
         capacity = darray_capacity(self) + (darray_capacity(self) >> 1);   //1.5 memory alloc
-        int* old_darr = self->elems;
+        CanIdNodePtr old_darr = self->elems;
         //printf(">>>(%d)\n", __LINE__);
-        int* new_darr = malloc(capacity * sizeof(int));
+        CanIdNodePtr new_darr = malloc(capacity * sizeof(CanIdNode));
         //printf(">>>(%d) %p\n", __LINE__, new_darr);
         if (!new_darr)
             return false;
@@ -98,7 +111,7 @@ static bool darray_expand(darray_t* self)
         size_t s = 0;
         while (s < darray_size(self))
         {
-            printf("mv old to new: s=%I64d old=%d\n", s, old_darr[s]);
+            printf("mv old to new: s=%I64d old=%d\n", s, old_darr[s].canId);
             new_darr[s] = old_darr[s];
             s++;
         }
@@ -127,7 +140,7 @@ bool darray_push_back(darray_t* self, void* data)
     assert(self);
     if (darray_expand(self))
     {
-        self->elems[self->tail++] = *((int*)data);
+        self->elems[self->tail++] = *((CanIdNodePtr)data);
         //self->tail = (self->tail + 1);
         self->size++;
         //printf("head=%I64d, tail=%I64d\n", self->head, self->tail);
@@ -140,6 +153,7 @@ bool darray_push_back(darray_t* self, void* data)
     return true;
 }
 
+/*
 bool darray_ring_append(darray_t* self, int data) //void*
 {
     assert(self);
@@ -157,6 +171,7 @@ bool darray_ring_append(darray_t* self, int data) //void*
     
     return true;
 }
+*/
 
 /* method of getting size/capacity  */
 bool darray_empty(const darray_t* self)
@@ -175,6 +190,7 @@ bool darray_is_full(const darray_t* self)
 }
 
 //for ring buffer
+/*
 int darray_ring_size(const darray_t* self)
 {
     int size = 0;
@@ -185,6 +201,7 @@ int darray_ring_size(const darray_t* self)
         size = self->tail + self->capacity - self->head;
     return size;
 }
+*/
 
 int darray_size(const darray_t* self)
 {
@@ -216,7 +233,7 @@ void darray_print(const darray_t* self)
         printf("=====capacity=%I64d, size=%I64d=====\n", self->capacity, self->size);
         for (i = 0; i < darray_size(self); i++)
         {
-            printf("%d ", self->elems[i]);
+            printf("%d(0x%x) ", self->elems[i].canId, self->elems[i].canId);
         }
 #endif
     }
@@ -230,7 +247,7 @@ bool is_drrary_empty(const darray_t* self)
 }
 */
 
-tCanbusFormat theCanbusFmt;
+//tCanbusFormat theCanbusFmt;
 static dictionary* canFmtIni;
 
 void add_node(CanIdNodePtr *start, int canId)
@@ -256,6 +273,8 @@ void add_node(CanIdNodePtr *start, int canId)
 
 int main(int argc, char* argv[])
 {
+    int canId;
+    WidgetInfo_t* widgetPtr;
     canFmtIni = iniparser_load("canbusfmt.ini");
     if (!canFmtIni)
     {
@@ -266,11 +285,22 @@ int main(int argc, char* argv[])
         dictionary_set(canFmtIni, "gear", NULL);
         dictionary_set(canFmtIni, "odo", NULL);
     }
+    
+    darray_t* darray = darray_create();
     // speed
-    theCanbusFmt.speed.canId = iniparser_getint(canFmtIni, "speed:canid", 0x101);
-    theCanbusFmt.speed.byteH = iniparser_getint(canFmtIni, "speed:byteH", 0);
-    theCanbusFmt.speed.byteL = iniparser_getint(canFmtIni, "speed:byteL", 0);
+    canId = iniparser_getint(canFmtIni, "speed:canid", 0x101);
+    
+    
+    widgetPtr = (WidgetInfo_t*)malloc(sizeof(WidgetInfo_t));
+    if (!widgetPtr)
+        printf("errlr\n");
+    widgetPtr->widget = WS_SPEED;
+    widgetPtr->byteH = iniparser_getint(canFmtIni, "speed:byteH", 0);
+    widgetPtr->byteL = iniparser_getint(canFmtIni, "speed:byteL", 0);
+    widgetPtr->next = NULL;
+    darray_push_back(darray, (void*)&canId);
 
+/*
     // gear
     theCanbusFmt.gear.canId = iniparser_getint(canFmtIni, "gear:canid", 0x102);
     theCanbusFmt.gear.byteH = iniparser_getint(canFmtIni, "gear:byteH", 0);
@@ -280,9 +310,10 @@ int main(int argc, char* argv[])
     theCanbusFmt.odo.canId = iniparser_getint(canFmtIni, "odo:canid", 0x102);
     theCanbusFmt.odo.byteH = iniparser_getint(canFmtIni, "odo:byteH", 0);
     theCanbusFmt.odo.byteL = iniparser_getint(canFmtIni, "odo:byteL", 0);  
-
+*/
     //printf("0x%x\n", theCanbusFmt.speed.canId);
-    
+
+#if 0    
     darray_t* darray = darray_create();
     int cnt = 1;
     int number = atoi(argv[1]);
@@ -293,15 +324,6 @@ int main(int argc, char* argv[])
         cnt++;
     }
     printf(">>>(%d)\n", __LINE__);
-    /*
-    darray_push_back(darray, 11);
-    darray_push_back(darray, 22);
-    darray_push_back(darray, 33);
-    darray_push_back(darray, 44);
-    darray_push_back(darray, 55);
-    darray_push_back(darray, 66);
-    darray_push_back(darray, 77);
-    */
+#endif
     darray_print(darray);
-    //printf("darray_empty:%d\n", darray_empty(darray));
 }
