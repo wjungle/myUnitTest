@@ -2,25 +2,86 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <stdbool.h>
+#include <string.h>
 #include "iniparser.h"
 #include "dictionary.h"
 
-typedef enum _WIESS_CUSTOMIZE_WIDGET
+#define LEN_MAX 16
+
+typedef enum _WIESS_CUSTOMIZE_SECTION
 {
-    WS_SPEED    = 1,
-    WS_GEAR     = 2,
-    WS_ODO      = 3,
-} WIESS_CUSTOMIZE_WIDGET;
+    WS_SPEED    = 0,
+    WS_GEAR,
+    WS_ODO,
+    WS_TEST1,
+    WS_TEST2,
+    WS_TEST3,
+    WS_TEST4,
+    WS_TEST5,
+    WS_TEST6,
+    WS_TEST7,
+    WS_TEST8,
+    WS_TEST9,    
+    WS_TEST10, 
+} WIESS_CUSTOMIZE_SECTION;
+
+struct wiess_section_table
+{
+    WIESS_CUSTOMIZE_SECTION widget;
+    char *widget_string;
+} ;
+
+struct wiess_section_table ws_table[] = 
+{
+    {WS_SPEED,  "speed"},
+    {WS_GEAR,   "gear"},
+    {WS_ODO,    "speed"},
+    {WS_TEST1,  "test1"},
+    {WS_TEST2,  "test2"},
+    {WS_TEST3,  "test3"},
+    {WS_TEST4,  "test4"},
+    {WS_TEST5,  "test5"},
+    {WS_TEST6,  "test6"},
+    {WS_TEST7,  "test7"},
+    {WS_TEST8,  "test8"},
+    {WS_TEST9,  "test9"},
+    {WS_TEST10, "test10"},
+} ;
+
+typedef enum _WIESS_CUSTOMIZE_KEY
+{
+    WK_CANID,
+    WK_BYTE_H,
+    WK_BYTE_L,
+    WK_BIT_H,
+    WK_BIT_L,
+} WIESS_CUSTOMIZE_KEY;
+
+struct wiess_key_table
+{
+    WIESS_CUSTOMIZE_KEY key;
+    char *key_string;
+} ;
+
+struct wiess_key_table wk_table[] =
+{
+    {WK_CANID,  "canid"},
+    {WK_BYTE_H, "byteH"},
+    {WK_BYTE_L, "byteL"},
+    {WK_BIT_H,  "bitH"},
+    {WK_BIT_L,  "bitL"},    
+} ;
 
 struct widgetInfo_t
 {
-    WIESS_CUSTOMIZE_WIDGET widget;
+    WIESS_CUSTOMIZE_SECTION widget;
     char byteH;
     char byteL;
     char bitH;
     char bitL;
     int len;
 } ;
+
 typedef struct widgetInfo_t WidgetInfo_t;
 
 struct widgetNode_t
@@ -290,11 +351,29 @@ void add_widget(const int canId, Darray_t* darray, WidgetInfo_t* info)
     return;
 }
 
+void make_string(char *name, int len, char *key)
+{
+    int i = len;
+    int size = LEN_MAX;
+
+    while (i < size) {
+        name[i] = '\0';
+        i++;
+    }
+    //printf("%s, %d, %s\n", name, len, key); 
+    strcat(name, key);
+    //printf("%s, %d, %s\n", name, len, key); 
+    return;
+}
 
 int main(int argc, char* argv[])
 {
     int canId;
     WidgetInfo_t info;
+    int numWidget = 0;
+    int numKey = 0;
+    int i, len;
+    char name[LEN_MAX] = {0};
   
     canFmtIni = iniparser_load("canbusfmt.ini");
     if (!canFmtIni)
@@ -308,24 +387,62 @@ int main(int argc, char* argv[])
     }
     
     Darray_t* darrayPtr = darray_create();
-    // speed
-    canId = iniparser_getint(canFmtIni, "speed:canid", 0x101);
-    //if canId is new
-    CanIdNode canIdNode = {canId, NULL, NULL};
-    darray_push_back(darrayPtr, (void*)&canIdNode);  
+    numWidget = sizeof(ws_table)/sizeof(struct wiess_section_table);
+    numKey = sizeof(wk_table)/sizeof(struct wiess_key_table);
+    printf("==>%d, %d\n", numWidget, numKey);
     
+    
+    for (i = 0; i < 2 ; i++) //numWidget
+    {
+        strcpy(name, ws_table[i].widget_string);
+        strcat(name, ":");
+        len = strlen(name);
+        printf("==>%d\n", len);
+        
+        make_string(name, len, wk_table[WK_CANID].key_string);
+        canId = iniparser_getint(canFmtIni, name, 0x101);
+        //if ()
+        {
+            CanIdNode canIdNode = {canId, NULL, NULL};
+            darray_push_back(darrayPtr, (void*)&canIdNode); 
+        }
+        
+        info.widget = ws_table[i].widget;
+        make_string(name, len, wk_table[WK_BYTE_H].key_string);
+        info.byteH = iniparser_getint(canFmtIni, name, 0);
+        
+        make_string(name, len, wk_table[WK_BYTE_L].key_string);
+        info.byteL = iniparser_getint(canFmtIni, name, 0);
+        
+        add_widget(canId, darrayPtr, &info);
+        
+    #if 0
+        for (j = 0; j < numKey; j++)
+        { 
+            make_string(name, len, wk_table[j].key_string);
+            printf("===>%s\n", name);
+        }
+    #endif    
+        //canId = iniparser_getint(canFmtIni, name, 0x101);
+    }
+    // speed
+    //canId = iniparser_getint(canFmtIni, "speed:canid", 0x101);
+    //if canId is new
+    //CanIdNode canIdNode = {canId, NULL, NULL};
+    //darray_push_back(darrayPtr, (void*)&canIdNode);  
+    /*
     info.widget = WS_SPEED;
     info.byteH = iniparser_getint(canFmtIni, "speed:byteH", 0);
     info.byteL = iniparser_getint(canFmtIni, "speed:byteL", 0);
     add_widget(canId, darrayPtr, &info);
-    
+
     // odo
     info.widget = WS_ODO;
     canId = iniparser_getint(canFmtIni, "odo:canid", 0x102);
     info.byteH = iniparser_getint(canFmtIni, "odo:byteH", 0);
     info.byteL = iniparser_getint(canFmtIni, "odo:byteL", 0); 
     add_widget(canId, darrayPtr, &info);
-
+    */
     darray_print(darrayPtr);
 /*
     // gear
