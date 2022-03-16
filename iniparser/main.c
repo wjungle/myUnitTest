@@ -35,7 +35,7 @@ struct wiess_section_table ws_table[] =
 {
     {WS_SPEED,  "speed"},
     {WS_GEAR,   "gear"},
-    {WS_ODO,    "speed"},
+    {WS_ODO,    "odo"},
     {WS_TEST1,  "test1"},
     {WS_TEST2,  "test2"},
     {WS_TEST3,  "test3"},
@@ -127,6 +127,8 @@ struct _darray_t
 };
 Darray_t* darray_create(void);
 bool darray_push_back(Darray_t* self, void* data);
+bool darray_id_exist(Darray_t* self, const int canid);
+int darray_find_id(Darray_t* self, const int canid);
 bool darray_empty(const Darray_t* self);
 bool darray_is_full(const Darray_t* self);
 int darray_ring_size(const Darray_t* self);
@@ -215,8 +217,32 @@ bool darray_push_back(Darray_t* self, void* data)
     {
         printf("expand failed\n");
     }
-    
+    //printf("darray size=%d\n", darray_size(self));
     return true;
+}
+
+// TODO: improve performance
+bool darray_id_exist(Darray_t* self, const int canid)
+{
+    assert(self);
+    for (int i = 0; i < darray_size(self); i++)
+    {
+        if (canid == self->elems[i].canId)
+            return true;
+    }
+    return false;
+}
+
+// TODO: improve performance
+int darray_find_id(Darray_t* self, const int canid)
+{
+    assert(self);
+    for (int i = 0; i < darray_size(self); i++)
+    {
+        if (canid == self->elems[i].canId)
+            return i;
+    }
+    return -1;
 }
 
 /*
@@ -299,17 +325,18 @@ void darray_print(const Darray_t* self)
         printf("=====capacity=%I64d, size=%I64d=====\n", self->capacity, self->size);
         for (i = 0; i < darray_size(self); i++)
         {
-            printf("%d(0x%x) ", self->elems[i].canId, self->elems[i].canId);
-        }
-        WidgetNode_t *node = self->elems->start;
-        while (node != NULL)
-        {
-            //printf("have widget\n");
-            //printf("widget=%d ", self->elems->start->info.widget);
-            //printf("byte H:%d L:%d\n", self->elems->start->info.byteH, self->elems->start->info.byteL);
-            printf("widget=%d ", node->info.widget);
-            printf("byte H:%d L:%d\n", node->info.byteH, node->info.byteL);
-            node = node->next;
+            printf("=====CANID(0x%x)=====\n", self->elems[i].canId);
+
+            WidgetNode_t *node = self->elems[i].start;
+            while (node != NULL)
+            {
+                //printf("have widget\n");
+                //printf("widget=%d ", self->elems->start->info.widget);
+                //printf("byte H:%d L:%d\n", self->elems->start->info.byteH, self->elems->start->info.byteL);
+                printf("\twidget=%d ", node->info.widget);
+                printf("byte H:%d L:%d\n", node->info.byteH, node->info.byteL);
+                node = node->next;
+            }
         }
 #endif
     }
@@ -335,18 +362,23 @@ void add_widget(const int canId, Darray_t* darray, WidgetInfo_t* info)
     nodePtr->info.byteL = info->byteL;
     nodePtr->next = NULL;
     
-    if (darray->elems->start == NULL) {
-        darray->elems->start = nodePtr;
-        printf("(%d)\n", __LINE__);
-        return;
-    }
-    else
+    int idx = darray_find_id(darray, canId);
+    //printf("idx=%d(%d)\n", idx, __LINE__);
+    if (idx != -1)
     {
-        printf("(%d)\n", __LINE__);
-        WidgetNode_t* curPtr = darray->elems->start;
-        while (curPtr->next != NULL)
-            curPtr = curPtr->next;
-        curPtr->next = nodePtr;
+        if (darray->elems[idx].start == NULL) {
+            darray->elems[idx].start = nodePtr;
+            //printf("new canid==>(%d)%x\n", __LINE__, canId);
+            return;
+        }
+        else
+        {
+            WidgetNode_t* curPtr = darray->elems[idx].start;
+            while (curPtr->next != NULL)
+                curPtr = curPtr->next;
+            curPtr->next = nodePtr;
+            //printf("cat canid==>(%d)%x\n", __LINE__, canId);
+        }
     }
     return;
 }
@@ -391,18 +423,17 @@ int main(int argc, char* argv[])
     numKey = sizeof(wk_table)/sizeof(struct wiess_key_table);
     printf("==>%d, %d\n", numWidget, numKey);
     
-    
-    for (i = 0; i < 2 ; i++) //numWidget
+    for (i = 0; i < numWidget ; i++) //numWidget 5
     {
         strcpy(name, ws_table[i].widget_string);
         strcat(name, ":");
         len = strlen(name);
-        printf("==>%d\n", len);
         
         make_string(name, len, wk_table[WK_CANID].key_string);
         canId = iniparser_getint(canFmtIni, name, 0x101);
-        //if ()
+        if (!darray_id_exist(darrayPtr, canId)) //darrayPtr->elems.start == NULL || 
         {
+            //printf("\t===>create\n");
             CanIdNode canIdNode = {canId, NULL, NULL};
             darray_push_back(darrayPtr, (void*)&canIdNode); 
         }
