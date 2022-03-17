@@ -398,6 +398,40 @@ void make_string(char *name, int len, char *key)
     return;
 }
 
+int compar(const void *a, const void *b)
+{
+    if (*(int*)a > *(int*)b)
+        return 1;
+    else
+        return 0;
+}
+typedef int (*ComparFun)(const void *a, const void *b);
+void bubble_sort(Darray_t* darrayPtr, size_t size, ComparFun cmp)
+{
+    int i, j, flag;
+    CanIdNode_t tmpNode;
+    
+    if (size < 2)
+        return;
+    
+    for (i = 1; i < size; i++) // pass number
+    {
+        for (j = 0; j < size - i; j++)
+        {
+            flag = 0;
+            if (cmp(&darrayPtr->elems[j].canId, &darrayPtr->elems[j+1].canId))
+            {
+                tmpNode = darrayPtr->elems[j];
+                darrayPtr->elems[j] = darrayPtr->elems[j+1];
+                darrayPtr->elems[j+1] = tmpNode;
+                flag = 1;
+            }
+        }
+        if (flag == 0)
+            break;
+    }
+}
+
 int main(int argc, char* argv[])
 {
     int canId;
@@ -456,6 +490,7 @@ int main(int argc, char* argv[])
     #endif    
         //canId = iniparser_getint(canFmtIni, name, 0x101);
     }
+    
     // speed
     //canId = iniparser_getint(canFmtIni, "speed:canid", 0x101);
     //if canId is new
@@ -474,6 +509,7 @@ int main(int argc, char* argv[])
     info.byteL = iniparser_getint(canFmtIni, "odo:byteL", 0); 
     add_widget(canId, darrayPtr, &info);
     */
+    bubble_sort(darrayPtr, darray_size(darrayPtr), compar);
     darray_print(darrayPtr);
 /*
     // gear
