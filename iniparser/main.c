@@ -101,14 +101,14 @@ typedef struct
 */
 
 /* Link List */
-struct canIdNode
+struct canIdNode_t
 {
     int canId;
-    struct canIdNode *next;
+    //struct canIdNode *next;
     WidgetNode_t* start;
 };
-typedef struct canIdNode CanIdNode;
-typedef CanIdNode *CanIdNodePtr;
+typedef struct canIdNode_t CanIdNode_t;
+typedef CanIdNode_t *CanIdNodePtr;
 
 
 /* Dynamic Array */
@@ -146,7 +146,7 @@ Darray_t* darray_create(void)
         darr->capacity = 5; // for test
         //darr->head = 0;
         darr->tail = 0;
-        darr->elems = malloc(darr->capacity * sizeof(CanIdNode));
+        darr->elems = malloc(darr->capacity * sizeof(CanIdNode_t));
         if (!darr->elems)
         {
             free(darr->elems);
@@ -173,7 +173,7 @@ static bool darray_expand(Darray_t* self)
         capacity = darray_capacity(self) + (darray_capacity(self) >> 1);   //1.5 memory alloc
         CanIdNodePtr old_darr = self->elems;
         //printf(">>>(%d)\n", __LINE__);
-        CanIdNodePtr new_darr = malloc(capacity * sizeof(CanIdNode));
+        CanIdNodePtr new_darr = malloc(capacity * sizeof(CanIdNode_t));
         //printf(">>>(%d) %p\n", __LINE__, new_darr);
         if (!new_darr)
             return false;
@@ -434,7 +434,7 @@ int main(int argc, char* argv[])
         if (!darray_id_exist(darrayPtr, canId)) //darrayPtr->elems.start == NULL || 
         {
             //printf("\t===>create\n");
-            CanIdNode canIdNode = {canId, NULL, NULL};
+            CanIdNode_t canIdNode = {canId, NULL/*, NULL*/};
             darray_push_back(darrayPtr, (void*)&canIdNode); 
         }
         
