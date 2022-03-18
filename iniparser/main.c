@@ -91,15 +91,6 @@ struct widgetNode_t
 } ;
 typedef struct widgetNode_t WidgetNode_t;
 
-/*
-typedef struct 
-{
-    tElementInfo speed;
-    tElementInfo gear;
-    tElementInfo odo;
-} tCanbusFormat;
-*/
-
 /* Link List */
 struct canIdNode_t
 {
@@ -245,26 +236,6 @@ int darray_find_id(Darray_t* self, const int canid)
     return -1;
 }
 
-/*
-bool darray_ring_append(Darray_t* self, int data) //void*
-{
-    assert(self);
-    
-    if (darray_is_full(self))
-    {
-        self->head = (self->head + 1) % self->capacity;
-        self->elems[self->head] = 0;
-    }
-        
-    self->tail = (self->tail + 1) % self->capacity;
-    self->elems[self->tail] = data;
-    self->size++;
-    printf("head=%I64d, tail=%I64d\n", self->head, self->tail);
-    
-    return true;
-}
-*/
-
 /* method of getting size/capacity  */
 bool darray_empty(const Darray_t* self)
 {
@@ -280,20 +251,6 @@ bool darray_is_full(const Darray_t* self)
     //return darray_ring_size(self) == real_capacity;
     return self->capacity == self->size;
 }
-
-//for ring buffer
-/*
-int darray_ring_size(const Darray_t* self)
-{
-    int size = 0;
-    
-    if (self->head < self->tail)
-        size = self->tail - self->head;
-    else
-        size = self->tail + self->capacity - self->head;
-    return size;
-}
-*/
 
 int darray_size(const Darray_t* self)
 {
@@ -334,7 +291,7 @@ void darray_print(const Darray_t* self)
                 //printf("widget=%d ", self->elems->start->info.widget);
                 //printf("byte H:%d L:%d\n", self->elems->start->info.byteH, self->elems->start->info.byteL);
                 printf("\twidget=%d ", node->info.widget);
-                printf("byte H:%d L:%d\n", node->info.byteH, node->info.byteL);
+                printf("byte H:%d L:%d | h:%d l:%d\n", node->info.byteH, node->info.byteL, node->info.bitH, node->info.bitL);
                 node = node->next;
             }
         }
@@ -360,6 +317,8 @@ void add_widget(const int canId, Darray_t* darray, WidgetInfo_t* info)
     nodePtr->info.widget = info->widget;
     nodePtr->info.byteH = info->byteH;
     nodePtr->info.byteL = info->byteL;
+    nodePtr->info.bitH = info->bitH;
+    nodePtr->info.bitL = info->bitL;    
     nodePtr->next = NULL;
     
     int idx = darray_find_id(darray, canId);
@@ -479,6 +438,16 @@ int main(int argc, char* argv[])
         make_string(name, len, wk_table[WK_BYTE_L].key_string);
         info.byteL = iniparser_getint(canFmtIni, name, 0);
         
+        make_string(name, len, wk_table[WK_BIT_H].key_string);
+        //printf(">%s\n", name);
+        info.bitH = iniparser_getint(canFmtIni, name, 0);
+        //printf(">%d\n", info.bitH);
+        
+        make_string(name, len, wk_table[WK_BIT_L].key_string);
+        //printf(">%s\n", name);
+        info.bitL = iniparser_getint(canFmtIni, name, 0);
+        //printf(">%d\n", info.bitL);
+        
         add_widget(canId, darrayPtr, &info);
         
     #if 0
@@ -491,34 +460,9 @@ int main(int argc, char* argv[])
         //canId = iniparser_getint(canFmtIni, name, 0x101);
     }
     
-    // speed
-    //canId = iniparser_getint(canFmtIni, "speed:canid", 0x101);
-    //if canId is new
-    //CanIdNode canIdNode = {canId, NULL, NULL};
-    //darray_push_back(darrayPtr, (void*)&canIdNode);  
-    /*
-    info.widget = WS_SPEED;
-    info.byteH = iniparser_getint(canFmtIni, "speed:byteH", 0);
-    info.byteL = iniparser_getint(canFmtIni, "speed:byteL", 0);
-    add_widget(canId, darrayPtr, &info);
-
-    // odo
-    info.widget = WS_ODO;
-    canId = iniparser_getint(canFmtIni, "odo:canid", 0x102);
-    info.byteH = iniparser_getint(canFmtIni, "odo:byteH", 0);
-    info.byteL = iniparser_getint(canFmtIni, "odo:byteL", 0); 
-    add_widget(canId, darrayPtr, &info);
-    */
     bubble_sort(darrayPtr, darray_size(darrayPtr), compar);
     darray_print(darrayPtr);
-/*
-    // gear
-    theCanbusFmt.gear.canId = iniparser_getint(canFmtIni, "gear:canid", 0x102);
-    theCanbusFmt.gear.byteH = iniparser_getint(canFmtIni, "gear:byteH", 0);
-    theCanbusFmt.gear.byteL = iniparser_getint(canFmtIni, "gear:byteL", 0);  
 
- 
-*/
     //printf("0x%x\n", theCanbusFmt.speed.canId);
 
 #if 0    
